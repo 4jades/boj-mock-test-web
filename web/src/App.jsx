@@ -94,6 +94,15 @@ function App() {
   const [isNarrow, setIsNarrow] = useState(false);
   const resultRef = useRef(null);
 
+  function openDateTimePicker(inputEl) {
+    if (!inputEl) return;
+    try {
+      inputEl.showPicker?.();
+    } catch {
+      inputEl.focus();
+    }
+  }
+
   const tiers = [
     { label: "Bronze 5", value: "b5" },
     { label: "Bronze 4", value: "b4" },
@@ -758,7 +767,8 @@ fun main() {
 
   useEffect(() => {
     function onResize() {
-      setIsNarrow(window.innerWidth < 1200);
+      const shouldStack = window.innerWidth < 1200 || window.innerHeight < 820;
+      setIsNarrow(shouldStack);
       if (editorRef.current) {
         editorRef.current.layout();
       }
@@ -1053,8 +1063,7 @@ fun main() {
                     type="datetime-local"
                     value={multiStartAt}
                     onChange={(e) => setMultiStartAt(e.target.value)}
-                    onClick={(e) => e.currentTarget.showPicker?.()}
-                    onFocus={(e) => e.currentTarget.showPicker?.()}
+                    onClick={(e) => openDateTimePicker(e.currentTarget)}
                   />
                 </div>
                 <div />
@@ -1562,15 +1571,17 @@ fun main() {
         {error && <div className="error" ref={errorRef}>{error}</div>}
           </div>
 
-          <div
-            className="splitter"
-            title="좌우 크기 조절"
-            onMouseDown={() => {
-              dragRef.current = true;
-            }}
-          >
-            <div className="splitterHandle" />
-          </div>
+          {!isNarrow && (
+            <div
+              className="splitter"
+              title="좌우 크기 조절"
+              onMouseDown={() => {
+                dragRef.current = true;
+              }}
+            >
+              <div className="splitterHandle" />
+            </div>
+          )}
 
           <div className="rightCol">
             <section className="editor">
