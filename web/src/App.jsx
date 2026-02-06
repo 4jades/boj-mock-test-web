@@ -799,12 +799,10 @@ fun main() {
                 <h2>시작 모드 선택</h2>
                 <div className="choiceGrid">
                   <div className="choiceCard">
-                    <button className="choiceBtn" onClick={() => setHomeStep("solo")}>싱글 모드</button>
-                    <div className="choiceDesc">혼자 풀기</div>
+                    <button className="choiceBtn" onClick={() => setHomeStep("solo")}>혼자 풀기</button>
                   </div>
                   <div className="choiceCard">
-                    <button className="choiceBtn" onClick={() => setHomeStep("multi")}>멀티 모드</button>
-                    <div className="choiceDesc">여러명 같이 풀기</div>
+                    <button className="choiceBtn" onClick={() => setHomeStep("multi")}>여러명 같이 풀기</button>
                   </div>
                 </div>
                 <div className="homeLinkRow">
@@ -943,7 +941,7 @@ fun main() {
                   <button className="choiceBtn" onClick={() => setHomeStep("multi-create")}>방 만들기</button>
                   <button className="choiceBtn" onClick={() => setHomeStep("multi-join")}>참여하기</button>
                 </div>
-                <div className="actionRow">
+                <div className="actionRow homeActionRow">
                   <button className="ghost" onClick={() => setHomeStep("choose")}>뒤로가기</button>
                   <div />
                 </div>
@@ -1112,7 +1110,7 @@ fun main() {
                 <div className="cardHead">
                   <h2>참여하기</h2>
                 </div>
-                <div className="choiceGrid">
+                <div className="choiceGrid full">
                   <button className="choiceBtn" onClick={() => setHomeStep("multi-join-realtime")}>세션 URL로 참여하기</button>
                 </div>
                 <div className="hint">
@@ -1142,7 +1140,7 @@ fun main() {
                 placeholder="세션 URL 또는 ID"
               />
               <input value={joinDisplayName} onChange={(e) => setJoinDisplayName(e.target.value)} placeholder="닉네임" />
-              <input type="password" value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)} placeholder="비밀번호" />
+              <input type="password" value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)} placeholder="사용할 비밀번호" />
               <div className="settingsArea">
                 <div className="fieldLabel">에디터 설정</div>
                 <label className="checkbox">

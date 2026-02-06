@@ -304,6 +304,10 @@ header {
   gap: 16px;
 }
 
+.choiceGrid.full {
+  grid-template-columns: 1fr;
+}
+
 .choiceCard {
   display: flex;
   flex-direction: column;
@@ -348,7 +352,6 @@ header {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
 }
 
 .handleList {
@@ -387,6 +390,10 @@ header {
   gap: 10px;
   align-items: center;
   margin-top: 12px;
+}
+
+.homeActionRow {
+  margin-top: 38px;
 }
 
 .actionRow.single {
