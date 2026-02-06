@@ -1,0 +1,14 @@
+{
+  "name": "boj-mock-web",
+  "private": true,
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "dev": "concurrently -k \"npm --prefix server run dev\" \"npm --prefix web run dev\"",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix server run start",
+    "runner:init": "npm --prefix server run runner:init"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

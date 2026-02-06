@@ -1,0 +1,40 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Builds
+web/dist/
+web/.vite/
+server/dist/
+
+# Runtime data
+server-data.db
+server-data.db-*
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Python cache (from local tools)
+__pycache__/
+.mypy_cache/
+
+# Runner temp
+/tmp/
+**/tmp/
+**/tmp/**
