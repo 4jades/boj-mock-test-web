@@ -24,4 +24,5 @@ export const CONFIG = {
   dockerJavaContainer: env.DOCKER_JAVA_CONTAINER || "boj-mock-java",
   dockerKotlinContainer: env.DOCKER_KOTLIN_CONTAINER || "boj-mock-kotlin",
   dockerWorkDir: env.DOCKER_WORKDIR || "/workspace",
+  exitOnFatal: String(env.EXIT_ON_FATAL || "true").toLowerCase() !== "false",
 };

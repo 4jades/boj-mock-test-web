@@ -57,7 +57,9 @@ export async function fetchProblemPage(problemId) {
     },
   });
 
-  if (!res.ok) throw new Error(`BOJ page fetch error: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    throw new Error(`BOJ page fetch error: ${res.status} ${res.statusText} problemId=${problemId}`);
+  }
 
   const html = await res.text();
   const $ = cheerio.load(html);
@@ -68,7 +70,7 @@ export async function fetchProblemPage(problemId) {
   const outputNode = $("#problem_output");
 
   if (titleNode.length === 0 || descNode.length === 0 || inputNode.length === 0 || outputNode.length === 0) {
-    throw new Error("BOJ page parse failed (missing sections).");
+    throw new Error(`BOJ page parse failed (missing sections) problemId=${problemId}`);
   }
 
   const title = (titleNode.text() || `BOJ ${problemId}`).trim();
@@ -76,7 +78,7 @@ export async function fetchProblemPage(problemId) {
   const input = inputNode.html();
   const output = outputNode.html();
 
-  if (!desc || !input || !output) throw new Error("BOJ problem sections not found.");
+  if (!desc || !input || !output) throw new Error(`BOJ problem sections not found problemId=${problemId}`);
 
   const samples = [];
   for (let i = 1; i <= 30; i++) {
