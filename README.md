@@ -89,6 +89,7 @@ RUNNER_MODE=docker npm run dev
 - `RUNNER_MODE`, `RUNNER_WORK_ROOT`
 - `RUN_TIMEOUT_MS`, `MAX_STDOUT_BYTES`, `MAX_STDERR_BYTES`
 - `MAX_CONCURRENT_RUNS`, `SESSION_TTL_HOURS`
+- `EXIT_ON_FATAL` (기본 `true`, 치명적 예외 시 프로세스 종료 후 systemd 재시작)
 
 ## 제한사항
 - MVP 성격상 LSP 기반 자동완성은 없음 (Monaco 기본 제공만 사용)

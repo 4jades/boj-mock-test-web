@@ -63,17 +63,25 @@ if (process.env.NODE_ENV !== "production") {
 app.use((req, res, next) => {
   const reqId = nanoid(8);
   const startAt = Date.now();
+  let logged = false;
   req.reqId = reqId;
 
-  res.on("finish", () => {
+  const writeRequestLog = (event) => {
+    if (logged) return;
+    logged = true;
     logInfo("request completed", {
       reqId,
+      event,
       method: req.method,
       path: req.originalUrl,
       status: res.statusCode,
       ms: Date.now() - startAt,
+      aborted: event === "close" && !res.writableEnded,
     });
-  });
+  };
+
+  res.on("finish", () => writeRequestLog("finish"));
+  res.on("close", () => writeRequestLog("close"));
 
   next();
 });
@@ -98,6 +106,7 @@ function getProblemCache(problemId) {
 async function pickValidByFetching(candidates, need, opts = {}) {
   const requireSamples = opts.requireSamples ?? false;
   const maxTry = Math.max(need, 1) * (opts.maxTryMultiplier ?? 30);
+  const rejectionLogLimit = opts.rejectionLogLimit ?? 10;
 
   const pool = candidates.slice();
   for (let i = pool.length - 1; i > 0; i--) {
@@ -108,6 +117,7 @@ async function pickValidByFetching(candidates, need, opts = {}) {
   const picked = [];
   let fetchFailed = 0;
   let sampleMissing = 0;
+  let rejectionLogged = 0;
 
   for (let i = 0; i < pool.length && picked.length < need && i < maxTry; i++) {
     const c = pool[i];
@@ -121,10 +131,13 @@ async function pickValidByFetching(candidates, need, opts = {}) {
       picked.push({ problemId: c.problemId, title: c.title });
     } catch (e) {
       fetchFailed += 1;
-      logWarn("problem candidate rejected", {
-        problemId: c.problemId,
-        reason: toErrorMessage(e),
-      });
+      if (rejectionLogged < rejectionLogLimit) {
+        rejectionLogged += 1;
+        logWarn("problem candidate rejected", {
+          problemId: c.problemId,
+          reason: e instanceof Error ? e.message : String(e),
+        });
+      }
       continue;
     }
   }
@@ -136,6 +149,8 @@ async function pickValidByFetching(candidates, need, opts = {}) {
     picked: picked.length,
     fetchFailed,
     sampleMissing,
+    rejectionLogged,
+    rejectionSuppressed: Math.max(0, fetchFailed - rejectionLogged),
   });
 
   return picked;
@@ -652,8 +667,14 @@ app.listen(CONFIG.port, () => {
 
 process.on("unhandledRejection", (reason) => {
   logError("unhandled rejection", { error: toErrorMessage(reason) });
+  if (CONFIG.exitOnFatal) {
+    setTimeout(() => process.exit(1), 0);
+  }
 });
 
 process.on("uncaughtException", (err) => {
   logError("uncaught exception", { error: toErrorMessage(err) });
+  if (CONFIG.exitOnFatal) {
+    setTimeout(() => process.exit(1), 0);
+  }
 });
