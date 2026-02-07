@@ -100,4 +100,31 @@ RUNNER_MODE=docker npm run dev
 - DB를 초기화하려면 SQLite 파일 삭제 (`server/src/config.js`의 `DB_PATH`)
 - TTL 정리는 서버에서 **30분마다 자동 실행**
 
+## 로그 확인
+- 요청/오류 로그는 JSON 형태로 `boj-mock` 서비스 로그에 남습니다.
+- 운영 서버에서 확인:
+```bash
+sudo journalctl -u boj-mock -f
+```
+
+## CI/CD (GitHub Actions)
+- `CI`: `.github/workflows/ci.yml`
+  - 모든 push/PR에서 의존성 설치 + 웹 빌드 검증
+- `Deploy`: `.github/workflows/deploy.yml`
+  - `main` 브랜치 push 또는 수동 실행 시 VM으로 SSH 배포
+
+### 필요한 GitHub Secrets
+- `OCI_VM_HOST`: VM 공인 IP 또는 도메인
+- `OCI_VM_USER`: SSH 사용자 (예: `ubuntu`)
+- `OCI_SSH_PRIVATE_KEY`: 배포용 개인키 전체 내용
+- `DEPLOY_DIR` (선택): 기본 `/opt/boj-mock-web`
+- `DEPLOY_BRANCH` (선택): 기본 `main`
+- `APP_SERVICE_NAME` (선택): 기본 `boj-mock`
+
+### 배포 동작
+1. 원격 서버에서 최신 코드 pull
+2. `web` 빌드 + `server` 의존성 설치
+3. 러너 컨테이너 초기화
+4. `boj-mock` systemd 서비스 재시작 및 헬스체크
+
 # boj-mock-test-web

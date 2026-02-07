@@ -6,7 +6,9 @@ export async function fetchCandidates(handles, minTier, maxTier) {
   url.searchParams.set("page", "1");
 
   const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`solved.ac API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    throw new Error(`solved.ac API error: ${res.status} ${res.statusText} query="${query}"`);
+  }
 
   const data = await res.json();
   return (data.items || []).map((p) => ({

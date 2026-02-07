@@ -17,12 +17,66 @@ import crypto from "crypto";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function toErrorMessage(err) {
+  if (err instanceof Error) return err.stack || err.message;
+  return String(err);
+}
+
+function log(level, message, meta = {}) {
+  const payload = {
+    ts: new Date().toISOString(),
+    level,
+    message,
+    ...meta,
+  };
+  const line = JSON.stringify(payload);
+  if (level === "error") {
+    console.error(line);
+    return;
+  }
+  if (level === "warn") {
+    console.warn(line);
+    return;
+  }
+  console.log(line);
+}
+
+function logInfo(message, meta) {
+  log("info", message, meta);
+}
+
+function logWarn(message, meta) {
+  log("warn", message, meta);
+}
+
+function logError(message, meta) {
+  log("error", message, meta);
+}
+
 const app = express();
 app.use(express.json({ limit: "512kb" }));
 
 if (process.env.NODE_ENV !== "production") {
   app.use(cors({ origin: true, credentials: true }));
 }
+
+app.use((req, res, next) => {
+  const reqId = nanoid(8);
+  const startAt = Date.now();
+  req.reqId = reqId;
+
+  res.on("finish", () => {
+    logInfo("request completed", {
+      reqId,
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      ms: Date.now() - startAt,
+    });
+  });
+
+  next();
+});
 
 const problemCache = new Map();
 const PROBLEM_CACHE_TTL = 10 * 60 * 1000;
@@ -52,18 +106,37 @@ async function pickValidByFetching(candidates, need, opts = {}) {
   }
 
   const picked = [];
+  let fetchFailed = 0;
+  let sampleMissing = 0;
 
   for (let i = 0; i < pool.length && picked.length < need && i < maxTry; i++) {
     const c = pool[i];
     try {
       const payload = await fetchProblemPage(c.problemId);
       setProblemCache(c.problemId, payload);
-      if (requireSamples && (!payload.samples || payload.samples.length === 0)) continue;
+      if (requireSamples && (!payload.samples || payload.samples.length === 0)) {
+        sampleMissing += 1;
+        continue;
+      }
       picked.push({ problemId: c.problemId, title: c.title });
-    } catch {
+    } catch (e) {
+      fetchFailed += 1;
+      logWarn("problem candidate rejected", {
+        problemId: c.problemId,
+        reason: toErrorMessage(e),
+      });
       continue;
     }
   }
+
+  logInfo("problem candidate scan finished", {
+    candidates: candidates.length,
+    need,
+    maxTry,
+    picked: picked.length,
+    fetchFailed,
+    sampleMissing,
+  });
 
   return picked;
 }
@@ -106,6 +179,10 @@ app.post("/api/handles/validate", async (req, res) => {
     const result = await validateHandles(handles);
     res.json(result);
   } catch (e) {
+    logError("handles validation failed", {
+      reqId: req.reqId,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
@@ -133,6 +210,14 @@ app.post("/api/session/solo", async (req, res) => {
 
       picked = await pickValidByFetching(candidates, problemCount, { requireSamples: true, maxTryMultiplier: 50 });
       if (picked.length < problemCount) {
+        logWarn("insufficient valid problems in solo session", {
+          reqId: req.reqId,
+          candidates: candidates.length,
+          requested: problemCount,
+          minTier,
+          maxTier,
+          handlesCount: handles.length,
+        });
         return res.status(400).json({ error: "유효한 문제를 충분히 찾지 못했습니다." });
       }
     }
@@ -170,6 +255,10 @@ app.post("/api/session/solo", async (req, res) => {
 
     res.json({ sessionId, problems, minutes: Number(minutes), hideMeta: true, startAt, started: true });
   } catch (e) {
+    logError("solo session creation failed", {
+      reqId: req.reqId,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
@@ -195,6 +284,14 @@ app.post("/api/session/group", async (req, res) => {
 
       picked = await pickValidByFetching(candidates, problemCount, { requireSamples: true, maxTryMultiplier: 50 });
       if (picked.length < problemCount) {
+        logWarn("insufficient valid problems in group session", {
+          reqId: req.reqId,
+          candidates: candidates.length,
+          requested: problemCount,
+          minTier,
+          maxTier,
+          handlesCount: handles.length,
+        });
         return res.status(400).json({ error: "유효한 문제를 충분히 찾지 못했습니다." });
       }
     }
@@ -220,6 +317,10 @@ app.post("/api/session/group", async (req, res) => {
 
     res.json({ sessionId, startAt: startAtMs, started: false });
   } catch (e) {
+    logError("group session creation failed", {
+      reqId: req.reqId,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
@@ -274,6 +375,11 @@ app.post("/api/session/:id/join", async (req, res) => {
       endAt,
     });
   } catch (e) {
+    logError("session join failed", {
+      reqId: req.reqId,
+      sessionId: req.params.id,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
@@ -293,6 +399,11 @@ app.post("/api/session/:id/finish", (req, res) => {
     emitEvent(sessionId, { type: "participant_finished", participantId });
     res.json({ ok: true });
   } catch (e) {
+    logError("session finish failed", {
+      reqId: req.reqId,
+      sessionId: req.params.id,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
@@ -308,6 +419,11 @@ app.post("/api/session/:id/code", (req, res) => {
     upsertParticipantCode({ participantId, problemId: Number(problemId), language: String(language), code: String(code || "") });
     res.json({ ok: true });
   } catch (e) {
+    logError("code save failed", {
+      reqId: req.reqId,
+      sessionId: req.params.id,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
@@ -318,6 +434,11 @@ app.get("/api/participant/:id/codes", (req, res) => {
     const codes = getParticipantCodes(participantId);
     res.json({ codes });
   } catch (e) {
+    logError("participant codes read failed", {
+      reqId: req.reqId,
+      participantId: req.params.id,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
@@ -379,6 +500,11 @@ app.get("/api/session/:id/problems", async (req, res) => {
 
     res.json({ problems, hideMeta: true, minutes: session.minutes });
   } catch (e) {
+    logError("session problems fetch failed", {
+      reqId: req.reqId,
+      sessionId: req.params.id,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
@@ -400,6 +526,7 @@ app.get("/api/session/:id/events", (req, res) => {
   });
 
   req.on("close", () => {
+    logInfo("sse client disconnected", { reqId: req.reqId, sessionId });
     unsubscribe();
   });
 });
@@ -477,6 +604,14 @@ app.post("/api/run", async (req, res) => {
 
     res.json({ perCaseResults: payload.results, runId: payload.runId });
   } catch (e) {
+    logError("run request failed", {
+      reqId: req.reqId,
+      sessionId,
+      participantId,
+      problemId,
+      language,
+      error: toErrorMessage(e),
+    });
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   } finally {
     decSessionRun(sessionId);
@@ -498,17 +633,27 @@ if (fs.existsSync(webDist)) {
 
 const expired = cleanupExpiredSessions();
 if (expired > 0) {
-  console.log(`expired sessions cleaned: ${expired}`);
+  logInfo("expired sessions cleaned", { expired });
 }
 
 setInterval(() => {
   const expired = cleanupExpiredSessions();
   if (expired > 0) {
-    console.log(`expired sessions cleaned: ${expired}`);
+    logInfo("expired sessions cleaned", { expired });
   }
 }, 30 * 60 * 1000);
 
 app.listen(CONFIG.port, () => {
-  console.log(`server listening on http://localhost:${CONFIG.port}`);
-  console.log(`runner mode: ${CONFIG.runnerMode}`);
+  logInfo("server started", {
+    url: `http://localhost:${CONFIG.port}`,
+    runnerMode: CONFIG.runnerMode,
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  logError("unhandled rejection", { error: toErrorMessage(reason) });
+});
+
+process.on("uncaughtException", (err) => {
+  logError("uncaught exception", { error: toErrorMessage(err) });
 });
