@@ -48,8 +48,16 @@ jobs:
 
             cd "$APP_DIR"
             git fetch origin "$DEPLOY_BRANCH"
-            git checkout "$DEPLOY_BRANCH"
-            git pull --ff-only origin "$DEPLOY_BRANCH"
+
+            # Keep the deploy working even if the working tree got local edits (e.g. manual hotfixes).
+            # Local state should live in .env, systemd units, /etc, etc. not tracked files.
+            if git show-ref --verify --quiet "refs/heads/$DEPLOY_BRANCH"; then
+              git checkout -f "$DEPLOY_BRANCH"
+            else
+              git checkout -f -B "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
+            fi
+            git reset --hard "origin/$DEPLOY_BRANCH"
+            git clean -fd
 
             # Stop service so dependencies aren't being used while we replace them.
             sudo systemctl stop "$APP_SERVICE_NAME" || true
