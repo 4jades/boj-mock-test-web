@@ -47,12 +47,17 @@ jobs:
             node server/scripts/runner-init.js
 
             sudo systemctl restart "$APP_SERVICE_NAME"
-            sudo systemctl is-active --quiet "$APP_SERVICE_NAME"
+            if ! sudo systemctl is-active --quiet "$APP_SERVICE_NAME"; then
+              echo "service failed to start: $APP_SERVICE_NAME" >&2
+              sudo systemctl status "$APP_SERVICE_NAME" --no-pager || true
+              sudo journalctl -u "$APP_SERVICE_NAME" -n 200 --no-pager || true
+              exit 1
+            fi
 
             # Wait for the server to bind the port before failing the deploy.
             ok=0
             for i in $(seq 1 30); do
-              if curl -fsS http://127.0.0.1:5179/api/health >/dev/null; then
+              if curl -fs http://127.0.0.1:5179/api/health >/dev/null 2>&1; then
                 ok=1
                 break
               fi
@@ -63,5 +68,6 @@ jobs:
               echo "healthcheck failed: /api/health not reachable on 127.0.0.1:5179" >&2
               sudo systemctl status "$APP_SERVICE_NAME" --no-pager || true
               sudo journalctl -u "$APP_SERVICE_NAME" -n 120 --no-pager || true
+              curl -fsS http://127.0.0.1:5179/api/health || true
               exit 1
             fi
