@@ -71,6 +71,10 @@ COMPILE_TIMEOUT_MS=12000
 MAX_STDOUT_BYTES=65536
 MAX_STDERR_BYTES=65536
 SESSION_TTL_HOURS=24
+# Optional: set an HTTP(S) proxy if this server IP is blocked by BOJ (403).
+# Example: BOJ_PROXY=http://user:pass@proxy-host:3128
+BOJ_PROXY=
+BOJ_FETCH_TIMEOUT_MS=8000
 EOF
 
 echo "[8/8] Initializing runner containers..."

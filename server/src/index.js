@@ -116,6 +116,7 @@ async function pickValidByFetching(candidates, need, opts = {}) {
 
   const picked = [];
   let fetchFailed = 0;
+  let boj403 = 0;
   let sampleMissing = 0;
   let rejectionLogged = 0;
 
@@ -131,29 +132,36 @@ async function pickValidByFetching(candidates, need, opts = {}) {
       picked.push({ problemId: c.problemId, title: c.title });
     } catch (e) {
       fetchFailed += 1;
+      const reason = e instanceof Error ? e.message : String(e);
+      if (reason.includes("BOJ page fetch error: 403")) {
+        boj403 += 1;
+      }
       if (rejectionLogged < rejectionLogLimit) {
         rejectionLogged += 1;
         logWarn("problem candidate rejected", {
           problemId: c.problemId,
-          reason: e instanceof Error ? e.message : String(e),
+          reason,
         });
       }
       continue;
     }
   }
 
-  logInfo("problem candidate scan finished", {
+  const stats = {
     candidates: candidates.length,
     need,
     maxTry,
     picked: picked.length,
     fetchFailed,
+    boj403,
     sampleMissing,
     rejectionLogged,
     rejectionSuppressed: Math.max(0, fetchFailed - rejectionLogged),
-  });
+  };
 
-  return picked;
+  logInfo("problem candidate scan finished", stats);
+
+  return { picked, stats };
 }
 
 const runningBySession = new Map();
@@ -223,7 +231,8 @@ app.post("/api/session/solo", async (req, res) => {
         return res.status(400).json({ error: "조건에 맞는 문제가 부족합니다." });
       }
 
-      picked = await pickValidByFetching(candidates, problemCount, { requireSamples: true, maxTryMultiplier: 50 });
+      const out = await pickValidByFetching(candidates, problemCount, { requireSamples: true, maxTryMultiplier: 50 });
+      picked = out.picked;
       if (picked.length < problemCount) {
         logWarn("insufficient valid problems in solo session", {
           reqId: req.reqId,
@@ -232,8 +241,14 @@ app.post("/api/session/solo", async (req, res) => {
           minTier,
           maxTier,
           handlesCount: handles.length,
+          ...(out.stats ?? {}),
         });
-        return res.status(400).json({ error: "유효한 문제를 충분히 찾지 못했습니다." });
+        const bojBlocked = (out.stats?.boj403 ?? 0) > 0 && (out.stats?.picked ?? 0) === 0;
+        return res.status(400).json({
+          error: bojBlocked
+            ? "BOJ 문제 페이지를 가져오지 못했습니다(403). 서버 IP가 차단된 상태일 수 있어요. 서버에 BOJ_PROXY(HTTP proxy) 설정이 필요합니다."
+            : "유효한 문제를 충분히 찾지 못했습니다.",
+        });
       }
     }
     if (!minutes || Number(minutes) <= 0) return res.status(400).json({ error: "minutes가 필요합니다." });
@@ -297,7 +312,8 @@ app.post("/api/session/group", async (req, res) => {
         return res.status(400).json({ error: "조건에 맞는 문제가 부족합니다." });
       }
 
-      picked = await pickValidByFetching(candidates, problemCount, { requireSamples: true, maxTryMultiplier: 50 });
+      const out = await pickValidByFetching(candidates, problemCount, { requireSamples: true, maxTryMultiplier: 50 });
+      picked = out.picked;
       if (picked.length < problemCount) {
         logWarn("insufficient valid problems in group session", {
           reqId: req.reqId,
@@ -306,8 +322,14 @@ app.post("/api/session/group", async (req, res) => {
           minTier,
           maxTier,
           handlesCount: handles.length,
+          ...(out.stats ?? {}),
         });
-        return res.status(400).json({ error: "유효한 문제를 충분히 찾지 못했습니다." });
+        const bojBlocked = (out.stats?.boj403 ?? 0) > 0 && (out.stats?.picked ?? 0) === 0;
+        return res.status(400).json({
+          error: bojBlocked
+            ? "BOJ 문제 페이지를 가져오지 못했습니다(403). 서버 IP가 차단된 상태일 수 있어요. 서버에 BOJ_PROXY(HTTP proxy) 설정이 필요합니다."
+            : "유효한 문제를 충분히 찾지 못했습니다.",
+        });
       }
     }
     if (!minutes || Number(minutes) <= 0) return res.status(400).json({ error: "minutes가 필요합니다." });

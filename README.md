@@ -89,6 +89,8 @@ RUNNER_MODE=docker npm run dev
 - `RUNNER_MODE`, `RUNNER_WORK_ROOT`
 - `RUN_TIMEOUT_MS`, `MAX_STDOUT_BYTES`, `MAX_STDERR_BYTES`
 - `MAX_CONCURRENT_RUNS`, `SESSION_TTL_HOURS`
+- `BOJ_PROXY` (선택): BOJ 페이지가 403으로 막히는 서버 환경에서 HTTP(S) 프록시를 통해 가져오기
+- `BOJ_FETCH_TIMEOUT_MS` (선택): BOJ 페이지 fetch 타임아웃 (기본 8000ms)
 - `EXIT_ON_FATAL` (기본 `true`, 치명적 예외 시 프로세스 종료 후 systemd 재시작)
 
 ## 제한사항

@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { ProxyAgent } from "undici";
 
 function absolutizeUrls(html, base) {
   const $ = cheerio.load(html);
@@ -44,18 +45,37 @@ function normalizeMath(html) {
   return out;
 }
 
+let proxyDispatcher = null;
+function getProxyDispatcher() {
+  const proxyUrl = process.env.BOJ_PROXY?.trim();
+  if (!proxyUrl) return null;
+  if (proxyDispatcher) return proxyDispatcher;
+  proxyDispatcher = new ProxyAgent(proxyUrl);
+  return proxyDispatcher;
+}
+
 export async function fetchProblemPage(problemId) {
   const url = `https://www.acmicpc.net/problem/${problemId}`;
 
-  const res = await fetch(url, {
-    headers: {
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Referer: "https://www.acmicpc.net/",
-    },
-  });
+  const timeoutMs = Number(process.env.BOJ_FETCH_TIMEOUT_MS || 8000);
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs));
+  let res;
+  try {
+    res = await fetch(url, {
+      signal: controller.signal,
+      dispatcher: getProxyDispatcher() ?? undefined,
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Referer: "https://www.acmicpc.net/",
+      },
+    });
+  } finally {
+    clearTimeout(t);
+  }
 
   if (!res.ok) {
     throw new Error(`BOJ page fetch error: ${res.status} ${res.statusText} problemId=${problemId}`);
